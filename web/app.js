@@ -21,7 +21,7 @@ const { GoogleAuth } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 
 // TODO: Define Issuer ID
-const issuerId = 'ISSUER_ID';
+const issuerId = '3388000000022207068';
 
 // TODO: Define Class ID
 const classId = `${issuerId}.codelab_class`;
@@ -37,10 +37,199 @@ const httpClient = new GoogleAuth({
 
 async function createPassClass(req, res) {
   // TODO: Create a Generic pass class
+  let genericClass = {
+  'id': `${classId}`,
+  'classTemplateInfo': {
+    'cardTemplateOverride': {
+      'cardRowTemplateInfos': [
+        {
+          'twoItems': {
+            'startItem': {
+              'firstValue': {
+                'fields': [
+                  {
+                    'fieldPath': 'object.textModulesData["points"]'
+                  }
+                ]
+              }
+            },
+            'endItem': {
+              'firstValue': {
+                'fields': [
+                  {
+                    'fieldPath': 'object.textModulesData["contacts"]'
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    'detailsTemplateOverride': {
+      'detailsItemInfos': [
+        {
+          'item': {
+            'firstValue': {
+              'fields': [
+                {
+                  'fieldPath': 'class.imageModulesData["event_banner"]'
+                }
+              ]
+            }
+          }
+        },
+        {
+          'item': {
+            'firstValue': {
+              'fields': [
+                {
+                  'fieldPath': 'class.textModulesData["game_overview"]'
+                }
+              ]
+            }
+          }
+        },
+        {
+          'item': {
+            'firstValue': {
+              'fields': [
+                {
+                  'fieldPath': 'class.linksModuleData.uris["official_site"]'
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  'imageModulesData': [
+    {
+      'mainImage': {
+        'sourceUri': {
+          'uri': 'https://storage.googleapis.com/wallet-lab-tools-codelab-artifacts-public/google-io-2021-card.png'
+        },
+        'contentDescription': {
+          'defaultValue': {
+            'language': 'en-US',
+            'value': 'Google I/O 2022 Banner'
+          }
+        }
+      },
+      'id': 'event_banner'
+    }
+  ],
+  'textModulesData': [
+    {
+      'header': 'Gather points meeting new people at Google I/O',
+      'body': 'Join the game and accumulate points in this badge by meeting other attendees in the event.',
+      'id': 'game_overview'
+    }
+  ],
+  'linksModuleData': {
+    'uris': [
+      {
+        'uri': 'https://io.google/2022/',
+        'description': 'Official I/O \'22 Site',
+        'id': 'official_site'
+      }
+    ]
+  }
+};
+
+let response;
+try {
+  // Check if the class exists already
+  response = await httpClient.request({
+    url: `${baseUrl}/genericClass/${classId}`,
+    method: 'GET'
+  });
+
+  console.log('Class already exists');
+  console.log(response);
+} catch (err) {
+  if (err.response && err.response.status === 404) {
+    // Class does not exist
+    // Create it now
+    response = await httpClient.request({
+      url: `${baseUrl}/genericClass`,
+      method: 'POST',
+      data: genericClass
+    });
+
+    console.log('Class insert response');
+    console.log(response);
+  } else {
+    // Something else went wrong
+    console.log(err);
+    res.send('Something went wrong...check the console logs!');
+  }
+}
 }
 
 async function createPassObject(req, res) {
   // TODO: Create a new Generic pass for the user
+let objectSuffix = `${req.body.email.replace(/[^\w.-]/g, '_')}`;
+let objectId = `${issuerId}.${objectSuffix}`;
+
+let genericObject = {
+  'id': `${objectId}`,
+  'classId': classId,
+  'genericType': 'GENERIC_TYPE_UNSPECIFIED',
+  'hexBackgroundColor': '#49ebd8',
+  'logo': {
+    'sourceUri': {
+      'uri': 'G:/My Drive/Docs/ucpa.png'
+    }
+  },
+  'cardTitle': {
+    'defaultValue': {
+      'language': 'en',
+      'value': 'UCPA Merignac'
+    }
+  },
+  'subheader': {
+    'defaultValue': {
+      'language': 'en',
+      'value': 'Member'
+    }
+  },
+  'header': {
+    'defaultValue': {
+      'language': 'en',
+      'value': 'Enrico Tormena'
+    }
+  },
+  'barcode': {
+    'type': 'QR_CODE',
+    'value': '027696221427'
+  },
+  'heroImage': {
+    'sourceUri': {
+      'uri': 'https://storage.googleapis.com/wallet-lab-tools-codelab-artifacts-public/google-io-hero-demo-only.jpg'
+    }
+  }
+};
+
+// TODO: Create the signed JWT and link
+const claims = {
+  iss: credentials.client_email,
+  aud: 'google',
+  origins: [],
+  typ: 'savetowallet',
+  payload: {
+    genericObjects: [
+      genericObject
+    ]
+  }
+};
+
+const token = jwt.sign(claims, credentials.private_key, { algorithm: 'RS256' });
+const saveUrl = `https://pay.google.com/gp/v/save/${token}`;
+
+res.send(`<a href='${saveUrl}'><img src='wallet-button.png'></a>`);
+res.send("Form submitted!");
 }
 
 const app = express();
